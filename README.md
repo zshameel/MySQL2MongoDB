@@ -3,6 +3,7 @@ A Python script to migrate MySQL table data to MongoDB collections
 
 ## How to use this script
 1. Install MySQL and MoggoDB modules using the following commands from a Python shell:
+
     `pip install mysql-connector-python`
     `pip install pymongo`
 
