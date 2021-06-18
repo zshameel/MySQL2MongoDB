@@ -1,15 +1,6 @@
 import mysql.connector
 import pymongo
-
-delete_existing_documents = True
-mysql_host="localhost"
-mysql_database="mydatabase"
-mysql_schema = "myschema"
-mysql_user="myuser"
-mysql_password="********"
-
-mongodb_host = "mongodb://localhost:27017/"
-mongodb_dbname = "mymongodb"
+import datetime
 
 class bcolors:
     HEADER = '\033[95m'
@@ -21,6 +12,19 @@ class bcolors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
+
+begin_time = datetime.datetime.now()
+print(f"{bcolors.HEADER}Script started at: {begin_time} {bcolors.ENDC}")
+
+delete_existing_documents = True;
+mysql_host="localhost"
+mysql_database="mydatabase"
+mysql_schema = "myschhema"
+mysql_user="root"
+mysql_password=""
+
+mongodb_host = "mongodb://localhost:27017/"
+mongodb_dbname = "mymongodb"
 
 print(f"{bcolors.HEADER}Initializing database connections...{bcolors.ENDC}")
 print("")
@@ -72,7 +76,7 @@ def migrate_table(db, col_name):
 
 #Iterate through the list of tables in the schema
 table_list_cursor = mysqldb.cursor()
-table_list_cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = %s ORDER BY table_name;", (mysql_schema,))
+table_list_cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = %s ORDER BY table_name LIMIT 15;", (mysql_schema,))
 tables = table_list_cursor.fetchall()
 
 total_count = len(tables)
@@ -81,16 +85,20 @@ fail_count = 0
 
 for table in tables:
     try:
-        print(f"{bcolors.OKCYAN}Processing table: " + table[0] + "..." + f"{bcolors.ENDC}")
+        print(f"{bcolors.OKCYAN}Processing table: {table[0]}...{bcolors.ENDC}")
         inserted_count = migrate_table(mysqldb, table[0])
-        print(f"{bcolors.OKGREEN}Processing table: " + table[0] + " completed. " + str(inserted_count) + " documents inserted." + f"{bcolors.ENDC}")
+        print(f"{bcolors.OKGREEN}Processing table: {table[0]} completed. {inserted_count} documents inserted.{bcolors.ENDC}")
         success_count += 1
     except Exception as e:
-        print(f"{bcolors.FAIL}"+ str(e) + f"{bcolors.ENDC}")
+        print(f"{bcolors.FAIL} {e} {bcolors.ENDC}")
         fail_count += 1
         
 print("")
 print("Migration completed.")
-print(f"{bcolors.OKGREEN}" + str(success_count) + " of " + str(total_count) + " tables migrated successfully." + f"{bcolors.ENDC}")
+print(f"{bcolors.OKGREEN}{success_count} of {total_count} tables migrated successfully.{bcolors.ENDC}")
 if fail_count > 0:
-    print(f"{bcolors.FAIL}Migration of " + str(fail_count) + " tables failed. See errors above." + f"{bcolors.ENDC}")
+    print(f"{bcolors.FAIL}Migration of {fail_count} tables failed. See errors above.{bcolors.ENDC}")
+
+end_time = datetime.datetime.now()
+print(f"{bcolors.HEADER}Script completed at: {end_time} {bcolors.ENDC}")
+print(f"{bcolors.HEADER}Total execution time: {end_time-begin_time} {bcolors.ENDC}")
