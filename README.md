@@ -28,3 +28,5 @@ A Python script to migrate MySQL table data to MongoDB collections
 
 
 3. Execute the script
+
+For more information, please check this blog out: https://thedeveloperspace.com/migrate-mysql-table-data-to-mongodb-collections-using-python/
