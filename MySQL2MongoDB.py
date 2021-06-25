@@ -1,6 +1,12 @@
+# Author: Shameel Ahmed (https://github.com/zshameel)
+# Date Created: 17-Jun-2021
+# Date Last Modified: 25-Jun-20201
+# Python version: 3.4+
+
 import mysql.connector
 import pymongo
 import datetime
+import enum
 
 class bcolors:
     HEADER = '\033[95m'
@@ -13,55 +19,45 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-begin_time = datetime.datetime.now()
-print(f"{bcolors.HEADER}Script started at: {begin_time} {bcolors.ENDC}")
+class MsgType(enum.Enum):
+    HEADER = 1
+    OKBLUE = 2
+    OKCYAN = 3
+    OKGREEN = 4
+    WARNING = 5
+    FAIL = 6
+    ENDC = 7
+    BOLD = 8
+    UNDERLINE = 9
 
-delete_existing_documents = True;
-mysql_host="localhost"
-mysql_database="mydatabase"
-mysql_schema = "myschhema"
-mysql_user="root"
-mysql_password=""
-
-mongodb_host = "mongodb://localhost:27017/"
-mongodb_dbname = "mymongodb"
-
-print(f"{bcolors.HEADER}Initializing database connections...{bcolors.ENDC}")
-print("")
-
-#MySQL connection
-print(f"{bcolors.HEADER}Connecting to MySQL server...{bcolors.ENDC}")
-mysqldb = mysql.connector.connect(
-    host=mysql_host,
-    database=mysql_database,
-    user=mysql_user,
-    password=mysql_password
-)
-print(f"{bcolors.HEADER}Connection to MySQL Server succeeded.{bcolors.ENDC}")
-
-#MongoDB connection
-print(f"{bcolors.HEADER}Connecting to MongoDB server...{bcolors.ENDC}")
-myclient = pymongo.MongoClient(mongodb_host)
-mydb = myclient[mongodb_dbname]
-print(f"{bcolors.HEADER}Connection to MongoDB Server succeeded.{bcolors.ENDC}")
-
-print(f"{bcolors.HEADER}Database connections initialized successfully.{bcolors.ENDC}")
-
-#Start migration
-print(f"{bcolors.HEADER}Migration started...{bcolors.ENDC}")
-dblist = myclient.list_database_names()
-if mongodb_dbname in dblist:
-    print(f"{bcolors.OKBLUE}The database exists.{bcolors.ENDC}")
-else:
-    print(f"{bcolors.WARNING}The database does not exist, it is being created.{bcolors.ENDC}")
+#Pretty Print Function
+def prettyprint(msg_text, msg_type):
+    if msg_type == MsgType.HEADER:
+        print(f"{bcolors.HEADER}{msg_text}{bcolors.ENDC}")
+    elif msg_type == MsgType.OKBLUE:
+        print(f"{bcolors.OKBLUE}{msg_text}{bcolors.ENDC}")
+    elif msg_type == MsgType.OKCYAN:
+        print(f"{bcolors.OKCYAN}{msg_text}{bcolors.ENDC}")
+    elif msg_type == MsgType.OKGREEN:
+        print(f"{bcolors.OKGREEN}{msg_text}{bcolors.ENDC}")
+    elif msg_type == MsgType.WARNING:
+        print(f"{bcolors.WARNING}{msg_text}{bcolors.ENDC}")
+    elif msg_type == MsgType.FAIL:
+        print(f"{bcolors.FAIL}{msg_text}{bcolors.ENDC}")
+    elif msg_type == MsgType.BOLD:
+        print(f"{bcolors.BOLD}{msg_text}{bcolors.ENDC}")
+    elif msg_type == MsgType.UNDERLINE:
+        print(f"{bcolors.UNDERLINE}{msg_text}{bcolors.ENDC}")
 
 #Function migrate_table 
-def migrate_table(db, col_name):
+def migrate_table(db, table_name):
+    #TODO: Sanitize table name to conform to MongoDB Collection naming restrictions
+    #For example, the $ sign is allowed in MySQL table names but not in MongoDB Collection names
     mycursor = db.cursor(dictionary=True)
-    mycursor.execute("SELECT * FROM " + col_name + ";")
+    mycursor.execute("SELECT * FROM " + table_name + ";")
     myresult = mycursor.fetchall()
 
-    mycol = mydb[col_name]
+    mycol = mydb[table_name]
     
     if delete_existing_documents:
         #delete all documents in the collection
@@ -74,31 +70,91 @@ def migrate_table(db, col_name):
     else:
         return 0
 
-#Iterate through the list of tables in the schema
-table_list_cursor = mysqldb.cursor()
-table_list_cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = %s ORDER BY table_name LIMIT 15;", (mysql_schema,))
-tables = table_list_cursor.fetchall()
+begin_time = datetime.datetime.now()
+abort = False
+prettyprint(f"Script started at: {begin_time}", MsgType.HEADER)
 
-total_count = len(tables)
-success_count = 0
-fail_count = 0
+delete_existing_documents = False;
+mysql_host="localhost"
+mysql_database="mydatabase"
+mysql_schema = "myschhema"
+mysql_user="root"
+mysql_password=""
 
-for table in tables:
-    try:
-        print(f"{bcolors.OKCYAN}Processing table: {table[0]}...{bcolors.ENDC}")
-        inserted_count = migrate_table(mysqldb, table[0])
-        print(f"{bcolors.OKGREEN}Processing table: {table[0]} completed. {inserted_count} documents inserted.{bcolors.ENDC}")
-        success_count += 1
-    except Exception as e:
-        print(f"{bcolors.FAIL} {e} {bcolors.ENDC}")
-        fail_count += 1
+mongodb_host = "mongodb://localhost:27017/"
+mongodb_dbname = "mymongodb"
+
+if (delete_existing_documents):
+    confirm_delete = input("Delete existing documents from collections (y)es/(n)o/(a)bort?")
+    if confirm_delete.lower() == "a":
+        abort = True
+    elif confirm_delete.lower() == "n":
+        delete_existing_documents = False
+    else:
+        #Confirm again
+        confirm_delete = input("Are you sure (y)es/(n)?")
+        if confirm_delete.lower() == "y":
+            delete_existing_documents = True
+        else:
+            abort = True
+
+if abort:
+    prettyprint("Script aborted by user", MsgType.FAIL)
+else:
+    if (delete_existing_documents):
+        prettyprint("Existing documents will be deleted from collections", MsgType.FAIL)
+    else:
+        prettyprint("Existing documents will not be deleted from collections", MsgType.OKGREEN)
         
-print("")
-print("Migration completed.")
-print(f"{bcolors.OKGREEN}{success_count} of {total_count} tables migrated successfully.{bcolors.ENDC}")
-if fail_count > 0:
-    print(f"{bcolors.FAIL}Migration of {fail_count} tables failed. See errors above.{bcolors.ENDC}")
+    #MySQL connection
+    prettyprint("Connecting to MySQL server...", MsgType.HEADER)
+    mysqldb = mysql.connector.connect(
+        host=mysql_host,
+        database=mysql_database,
+        user=mysql_user,
+        password=mysql_password
+    )
+    prettyprint("Connection to MySQL Server succeeded.", MsgType.OKGREEN)
 
+    #MongoDB connection
+    prettyprint("Connecting to MongoDB server...", MsgType.HEADER)
+    myclient = pymongo.MongoClient(mongodb_host)
+    mydb = myclient[mongodb_dbname]
+    prettyprint("Connection to MongoDB Server succeeded.", MsgType.OKGREEN)
+
+    #Start migration
+    prettyprint("Migration started...", MsgType.HEADER)
+
+    dblist = myclient.list_database_names()
+    if mongodb_dbname in dblist:
+        prettyprint("The database exists.", MsgType.OKBLUE)
+    else:
+        prettyprint("The database does not exist, it is being created.", MsgType.WARNING)
+
+    #Iterate through the list of tables in the schema
+    table_list_cursor = mysqldb.cursor()
+    table_list_cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = %s ORDER BY table_name LIMIT 15;", (mysql_schema,))
+    tables = table_list_cursor.fetchall()
+
+    total_count = len(tables)
+    success_count = 0
+    fail_count = 0
+
+    for table in tables:
+        try:
+            prettyprint(f"Processing table: {table[0]}...", MsgType.OKCYAN)
+            inserted_count = migrate_table(mysqldb, table[0])
+            success_count += 1
+            prettyprint(f"Processing table: {table[0]} completed. {inserted_count} documents inserted.", MsgType.OKGREEN)
+        except Exception as e:
+            fail_count += 1
+            prettyprint(f"{e}", MsgType.FAIL)
+
+    prettyprint("Migration completed.", MsgType.HEADER)
+    prettyprint(f"{success_count} of {total_count} tables migrated successfully.", MsgType.OKGREEN)
+    if fail_count > 0:
+        prettyprint(f"Migration of {fail_count} tables failed. See errors above.", MsgType.FAIL)
+    
 end_time = datetime.datetime.now()
-print(f"{bcolors.HEADER}Script completed at: {end_time} {bcolors.ENDC}")
-print(f"{bcolors.HEADER}Total execution time: {end_time-begin_time} {bcolors.ENDC}")
+prettyprint(f"Script completed at: {end_time}", MsgType.HEADER)
+prettyprint(f"Total execution time: {end_time-begin_time}", MsgType.HEADER)
